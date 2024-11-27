@@ -1,3 +1,5 @@
+#include <EEPROM.h>
+
 // Pins for ultrasonic sensor
 const int trigPin = 9;
 const int echoPin = 10;
@@ -19,6 +21,12 @@ const int outPin = 12;
 int blackValues[3];   // For Coca-Cola
 int whiteValues[3];   // For Sprite
 int orangeValues[3];  // For Mirinda
+
+// EEPROM addresses for storing calibration values
+const int CALIBRATION_FLAG_ADDR = 0;
+const int BLACK_VALUES_ADDR = 1;
+const int WHITE_VALUES_ADDR = 10;
+const int ORANGE_VALUES_ADDR = 19;
 
 void setup() {
   // Initialize serial communication
@@ -52,8 +60,15 @@ void setup() {
   digitalWrite(relay2IN1, HIGH);
   digitalWrite(relay2IN2, HIGH);
 
-  // Calibrate the sensor
-  calibrateSensor();
+  // Check if calibration has been done before
+  if (EEPROM.read(CALIBRATION_FLAG_ADDR) != 1) {
+    calibrateSensor();
+  } else {
+    // Load calibration values from EEPROM
+    loadCalibrationValues();
+    Serial.println("Loaded calibration values from EEPROM");
+    printCalibrationValues();
+  }
 }
 
 void loop() {
@@ -158,6 +173,14 @@ void calibrateSensor() {
 
   Serial.println("Calibration complete!");
   printCalibrationValues();
+
+  // Store calibration values in EEPROM
+  storeCalibrationValues();
+
+  // Set the calibration flag
+  EEPROM.write(CALIBRATION_FLAG_ADDR, 1);
+
+  Serial.println("Calibration values stored in EEPROM");
 }
 
 void readColor(int* colorValues) {
@@ -202,4 +225,25 @@ bool isClosestColor(int r, int g, int b, int* targetColor) {
 
 int colorDifference(int r, int g, int b, int* targetColor) {
   return abs(r - targetColor[0]) + abs(g - targetColor[1]) + abs(b - targetColor[2]);
+}
+
+void storeCalibrationValues() {
+  for (int i = 0; i < 3; i++) {
+    EEPROM.write(BLACK_VALUES_ADDR + i, blackValues[i]);
+    EEPROM.write(WHITE_VALUES_ADDR + i, whiteValues[i]);
+    EEPROM.write(ORANGE_VALUES_ADDR + i, orangeValues[i]);
+  }
+}
+
+void loadCalibrationValues() {
+  for (int i = 0; i < 3; i++) {
+    blackValues[i] = EEPROM.read(BLACK_VALUES_ADDR + i);
+    whiteValues[i] = EEPROM.read(WHITE_VALUES_ADDR + i);
+    orangeValues[i] = EEPROM.read(ORANGE_VALUES_ADDR + i);
+  }
+}
+
+void forceRecalibration() {
+  EEPROM.write(CALIBRATION_FLAG_ADDR, 0);
+  calibrateSensor();
 }
